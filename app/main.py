@@ -1,9 +1,10 @@
+import csv
 import os
 from dotenv import load_dotenv
 import uvicorn
 
 from fastapi import FastAPI, Body, HTTPException, status
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse, StreamingResponse
 
 from bson import ObjectId
 import motor.motor_asyncio
@@ -58,6 +59,24 @@ async def get_all_shareholders():
     """
     shareholders = await collection.find().to_list(length=None)
     return shareholders
+
+
+# This is probably slow, try refactoring to use StreamingResponse
+@app.get("/csv/")
+async def export_shareholders_csv():
+    """
+    Export all shareholders to a CSV file sorted by the "shares" field in descending order.
+    """
+    shareholders = await collection.find().sort("shares", -1).to_list(length=None)
+
+    filename = "shareholders.csv"
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Name", "Shares"])
+        for shareholder in shareholders:
+            writer.writerow([shareholder["name"], shareholder["shares"]])
+        
+    return FileResponse(filename, filename=filename, media_type="text/csv")
 
 
 @app.post(
